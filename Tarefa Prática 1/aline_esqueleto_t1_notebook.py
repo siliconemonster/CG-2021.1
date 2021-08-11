@@ -31,6 +31,8 @@ for fn in uploaded.keys():
 
 """# Code (inside test and Screen class)"""
 
+graphic_data
+
 def inside(x, y, primitive):
   """
   Check if point (x,y) is inside the primitive
@@ -45,7 +47,40 @@ def inside(x, y, primitive):
   # You should implement your inside test here for all shapes   
   # for now, it only returns a false test
 
+  # To do (triângulo, círculo, polígono convexo) - primeiro parágrafo que tem coisa pra fazer
+  # {'shape': 'polygon', 'vertices': [[50, 25], [300, 25], [300, 140], [160, 180]], 'color': [121, 67, 91], 'xform': [[0.5, 0, 15], [0, 0.75, 20], [0, 0, 1]]}
+
+  if (primitive["shape"] == "triangle"):
+    if (insideTriangle(x, y, primitive["vertices"]) == True):
+      return True
+    return False
+
+  if (primitive["shape"] == "circle"):
+    for triangle in primitive["triangulation"]:
+      if (insideTriangle(x, y, triangle) == True):
+        return True
+
   return False
+
+def circleTriangulation(circle): # centro, raio * cosseno, raio * seno
+  triangles = []
+  points = []
+  slices = 12
+
+  for i in range(slices):
+    # somei ao centro pois o círculo não está necessariamente centrado na origem
+    x = circle["center"][0] + (circle["radius"] * np.cos(2 * np.pi * i / 60))
+    y = circle["center"][1] + (circle["radius"] * np.sin(2 * np.pi * i / 60)) 
+    point = [x, y]
+    points.append(point)
+
+  for i in range(slices):
+    A = circle["center"].copy()
+    B = points[i].copy()
+    C = points[(i+1)%slices].copy() 
+    triangles.append([A, B, C])
+
+  return triangles
 
 def buildsVector(pointA, pointB): # AB = B - A
   vector = np.zeros(2, int)
@@ -60,25 +95,26 @@ def buildsVector(pointA, pointB): # AB = B - A
 
   return vector
 
-def findNormal(vector): # é basicamente uma rotação horária
+def findNormal(vector): # é basicamente uma rotação anti-horária
   normal = np.zeros(2, int)
   
   i = vector[0]
   j = vector[1]
 
-  normal[0] = j
-  normal[1] = -i
+  normal[0] = -j
+  normal[1] = i
 
   return normal
 
-def insideTriangle(x, y, triangle): # para rotação no sentido horário
+def insideTriangle(x, y, triangle): # para rotação no sentido anti-horário
+
   #inicialização de variáveis
   AB = BC = CA = np.zeros(2, int)
   Ap = Bp = Cp = np.zeros(2, int)
   nAB = nBC = nCA = np.zeros(2, int)
   alfaAB = alfaBC = alfaCA = 0
   
-  # Ajustando os vertices e o ponto
+  # Ajustando os vértices e o ponto
   A = triangle[0]
   B = triangle[1]
   C = triangle[2]
@@ -94,12 +130,12 @@ def insideTriangle(x, y, triangle): # para rotação no sentido horário
   Bp = buildsVector(B, p)
   Cp = buildsVector(C, p)
 
-  # Encontrando as normais dos vetores do triângulo
+  # Encontrando as normais (para dentro) aos vetores do triângulo
   nAB = findNormal(AB)
   nBC = findNormal(BC)
   nCA = findNormal(CA)
 
-  # Dot product das normais de cada vetor do triângulo com os vetores dos vértices aos pontos
+  # Produto interno das normais de cada vetor do triângulo com os vetores dos vértices aos pontos
   alfaAB = nAB @ Ap
   alfaBC = nBC @ Bp
   alfaCA = nCA @ Cp
@@ -107,11 +143,10 @@ def insideTriangle(x, y, triangle): # para rotação no sentido horário
   # Se todos os alfas forem positivos, sinal de que o ângulo é agudo e o ponto está dentro do triângulo
   if (alfaAB >= 0 and alfaBC >= 0 and alfaCA >= 0):
     return True
-
   return False
 
 triangulo = np.array([[10,30], [60,100], [50,10]])
-insideTriangle(40,60,triangulo)
+insideTriangle(40,60.5,triangulo)
 
 class Screen:
   ''' Creates a virtual basic screen
@@ -137,6 +172,13 @@ class Screen:
       scene (dict): Scene containing the graphic primitives with additional info
     '''
 
+    # To do bounding box - segundo parágrafo que tem coisa pra fazer
+
+
+
+    # To do (triangularização do círculo
+
+
     # Possible preprocessing with scene primitives, for now we don't change anything
     # You may define bounding boxes, convert shapes, etc
     preprop_scene = []
@@ -144,6 +186,10 @@ class Screen:
     for primitive in scene:
       # do some processing
       # for now, only copies each primitive to a new list
+
+      if (primitive["shape"] == "circle"):
+        triangles = circleTriangulation(primitive)
+        primitive["triangulation"] = triangles
       
       preprop_scene.append(primitive)
 
