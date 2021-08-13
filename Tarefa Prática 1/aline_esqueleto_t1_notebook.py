@@ -8,6 +8,12 @@ Original file is located at
 
 Aline Freire de Rezende<br>116110571
 
+[v] tá dentro do triângulo?<br>
+[  ] tá dentro do poligono?<br>
+[  ] triangularização de círculo<br>
+[v] bounding box<br>
+[  ] transformação<br>
+
 # Python imports
 """
 
@@ -31,8 +37,6 @@ for fn in uploaded.keys():
 
 """# Code (inside test and Screen class)"""
 
-graphic_data
-
 def inside(x, y, primitive):
   """
   Check if point (x,y) is inside the primitive
@@ -47,11 +51,24 @@ def inside(x, y, primitive):
   # You should implement your inside test here for all shapes   
   # for now, it only returns a false test
 
-  # To do (triângulo, círculo, polígono convexo) - primeiro parágrafo que tem coisa pra fazer
-  # {'shape': 'polygon', 'vertices': [[50, 25], [300, 25], [300, 140], [160, 180]], 'color': [121, 67, 91], 'xform': [[0.5, 0, 15], [0, 0.75, 20], [0, 0, 1]]}
+  if "xform" in primitive:
+    if (primitive["shape"] == "circle"):
+      for triangle in primitive["transTriangles"]:
+        if (insideTriangle(x, y, triangle) == True):
+          return True
+      return False  
+      
+    if (primitive["shape"] == "triangle"):
+      if (insideTriangle(x, y, primitive["transVertices"]) == True):
+        return True
+      return False
+
+    # else: #polígono
+
 
   if (primitive["shape"] == "triangle"):
-    if (insideTriangle(x, y, primitive["vertices"]) == True):
+    vertices = primitive["vertices"].copy()
+    if (insideTriangle(x, y, vertices) == True):
       return True
     return False
 
@@ -62,15 +79,86 @@ def inside(x, y, primitive):
 
   return False
 
+#def insidePolygon(polygon):
+
+def circleTransformation(primitive):
+  transTri = []
+
+  for triangle in primitive["triangulation"]:
+    dic = {}
+    dic["xform"] = primitive["xform"]
+    dic["vertices"] = triangle
+    transformation(dic)
+    transTri.append(dic["transVertices"])
+
+  primitive["transTriangles"] = transTri
+
+  return
+
+def transformation(primitive):
+  transMatrix = primitive["xform"]
+  vertices = primitive["vertices"].copy()
+  trans = []
+
+  for vertice in vertices:
+    x = vertice[0]
+    y = vertice[1]
+    xNew = transMatrix[0][0] * x + transMatrix[0][1] * y + transMatrix[0][2] * 1
+    yNew = transMatrix[1][0] * x + transMatrix[1][1] * y + transMatrix[1][2] * 1
+    trans.append([xNew, yNew])
+
+  primitive["transVertices"] = trans
+
+  return
+
+def boundingBox(primitive): # consiste em pegar os maiores e menores x's e y's
+  
+  if (primitive["shape"] == "circle"):
+    if "xform" in primitive:
+      for triangle in primitive["triangulation"]:
+        points = triangle
+
+        xMin = min(vertice[0] for vertice in points)
+        xMax = max(vertice[0] for vertice in points)
+        yMin = min(vertice[1] for vertice in points)
+        yMax = max(vertice[1] for vertice in points)
+      
+    else:
+      center = primitive["center"]
+      radius = primitive["radius"]
+
+      xMin = center[0] - radius
+      xMax = center[0] + radius
+      yMin = center[1] - radius
+      yMax = center[1] + radius
+
+  else:
+    if "xform" in primitive:
+      points = primitive["transVertices"].copy()
+    else:
+      points = primitive["vertices"].copy()
+
+    xMin = min(vertice[0] for vertice in points)
+    xMax = max(vertice[0] for vertice in points)
+    yMin = min(vertice[1] for vertice in points)
+    yMax = max(vertice[1] for vertice in points)
+
+  xMin = int(xMin)
+  xMax = int(xMax + 1)
+  yMin = int(yMin)
+  yMax = int(yMax + 1)
+
+  return ([xMin, xMax], [yMin, yMax])
+
 def circleTriangulation(circle): # centro, raio * cosseno, raio * seno
   triangles = []
   points = []
-  slices = 12
+  slices = 60
 
   for i in range(slices):
     # somei ao centro pois o círculo não está necessariamente centrado na origem
-    x = circle["center"][0] + (circle["radius"] * np.cos(2 * np.pi * i / 60))
-    y = circle["center"][1] + (circle["radius"] * np.sin(2 * np.pi * i / 60)) 
+    x = circle["center"][0] + (circle["radius"] * np.cos((2 * np.pi * i) / 60))
+    y = circle["center"][1] + (circle["radius"] * np.sin((2 * np.pi * i) / 60)) 
     point = [x, y]
     points.append(point)
 
@@ -187,9 +275,20 @@ class Screen:
       # do some processing
       # for now, only copies each primitive to a new list
 
+
+      # executa a triangularização do círculo
       if (primitive["shape"] == "circle"):
         triangles = circleTriangulation(primitive)
         primitive["triangulation"] = triangles
+
+
+      # executa a transformação na primitiva (opções: círculo ou qualquer polígono)
+      if "xform" in primitive:
+        if (primitive["shape"] == "circle"):
+         circleTransformation(primitive)  
+
+        else:
+          transformation(primitive)      
       
       preprop_scene.append(primitive)
 
@@ -202,18 +301,28 @@ class Screen:
       image (numpy array): White image with R, G, B channels
     '''
 
-    self._image = 255 *  np.ones((self._height, self._width, 3), np.uint8)
+    self._image = 255 * np.ones((self._height, self._width, 3), np.uint8)
 
   def rasterize(self):
     ''' Rasterize the primitives along the Screen    
     '''
     
     for primitive in self._scene:
+
+      # define uma bounding box
+      bBox = boundingBox(primitive)
+      print(bBox)
+
+      # não está nos exemplos, mas casos em que a bounding box tenha cordenadas negativas, esse trecho limita ao primeiro quadrante (afinal, não há pixels negativos)
+      for j in range(2):
+        for i in range(2):
+          if bBox[i][j] < 0: bBox[i][j] = 0
+
     # Loop through all pixels
     # You MUST use bounding boxes in order to speed up this loop
-      for w in range(0, self._width):
+      for w in range(bBox[0][0], bBox[0][1]):
         x = w + 0.5
-        for h in range(0, self._height):
+        for h in range(bBox[1][0], bBox[1][1]):
           y = h + 0.5
           # First, we check if the pixel center is inside the primitive
           if ( inside(x, y, primitive) ):
