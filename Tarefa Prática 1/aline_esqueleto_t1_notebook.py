@@ -33,6 +33,227 @@ for fn in uploaded.keys():
 
 """# Code (inside test and Screen class)"""
 
+# TRIANGULARIZAÇÃO DO CÍRCULO
+
+def circleTriangulation(circle): # centro, raio * cosseno, raio * seno
+  '''Executa a triangularização de um círculo
+  
+  Args:
+    circle: primitiva, sendo ela um círculo
+  Returns:
+    triangles (list): lista com os vértices dos triângulos
+  '''
+
+  triangles = []
+  points = []
+  slices = 20
+
+  for i in range(slices):
+    # somei ao centro pois o círculo não está necessariamente centrado na origem
+    x = circle["center"][0] + (circle["radius"] * np.cos((2 * np.pi * i) / slices))
+    y = circle["center"][1] + (circle["radius"] * np.sin((2 * np.pi * i) / slices)) 
+    point = [x, y]
+    points.append(point)
+
+  for i in range(slices):
+    A = circle["center"].copy()
+    B = points[i].copy()
+    C = points[(i+1)%slices].copy() 
+    triangles.append([A, B, C])
+
+  return triangles
+
+# TRANSFORMAÇÃO AFIM
+
+def circleTransformation(primitive):
+  '''Aplica a transformação afim nos triângulos obtidos na triangularização do círculo'''
+
+  transTri = []
+
+  for triangle in primitive["triangulation"]:
+    dic = {}
+    dic["xform"] = primitive["xform"]
+    dic["vertices"] = triangle
+    transformation(dic)
+    transTri.append(dic["transVertices"])
+
+  primitive["transTriangles"] = transTri
+
+  return  
+
+# ----------------- 
+
+def transformation(primitive):
+  '''Aplica a transformação afim em polígonos'''
+
+  transMatrix = primitive["xform"]
+  vertices = primitive["vertices"].copy()
+  trans = []
+
+  for vertice in vertices:
+    x = vertice[0]
+    y = vertice[1]
+    xNew = transMatrix[0][0] * x + transMatrix[0][1] * y + transMatrix[0][2] * 1
+    yNew = transMatrix[1][0] * x + transMatrix[1][1] * y + transMatrix[1][2] * 1
+    xNew = int(xNew)
+    yNew = int(yNew)
+    trans.append([xNew, yNew])
+  
+  primitive["transVertices"] = trans
+
+  return
+
+# CRIAÇÃO DA BOUNDING BOX
+
+def bBoxMultTriangles(primitive):
+  '''Encontra a bounding box para uma coleção de triangulos resultantes da triangulação de um círculo transformado
+  
+  Returns:
+    xMin, xMax, yMin, yMax (int): delimitações inferiores e superiores de cada coordenada
+  '''
+  x = y = []
+
+  for triangle in primitive["transTriangles"]:
+    for vertice in triangle:
+      x.append(int(vertice[0]))
+      y.append(int(vertice[1]))
+
+  xMin = min(x)
+  xMax = max(x)
+  yMin = min(y)
+  yMax = max(y)
+
+  return xMin, xMax, yMin, yMax
+
+# ----------------- 
+
+def boundingBox(primitive): # consiste em pegar os maiores e menores x's e y's
+  '''Encontra a bounding box para polígonos por meio dos novos vértices, e para círculos por meio do centro e do raio
+  
+  Returns:
+    ([xMin, xMax], [yMin, yMax]) (tuple): delimitações inferiores e superiores de cada coordenada, já em formato de pontos
+  '''
+  
+  if (primitive["shape"] == "circle"):
+    if "xform" in primitive:
+      xMin, xMax, yMin, yMax = bBoxMultTriangles(primitive)        
+      
+    else:
+      center = primitive["center"]
+      radius = primitive["radius"]
+
+      xMin = center[0] - radius
+      xMax = center[0] + radius
+      yMin = center[1] - radius
+      yMax = center[1] + radius
+
+  else:
+    if "xform" in primitive:
+      points = primitive["transVertices"].copy()
+    else:
+      points = primitive["vertices"].copy()
+
+    xMin = min(vertice[0] for vertice in points)
+    xMax = max(vertice[0] for vertice in points)
+    yMin = min(vertice[1] for vertice in points)
+    yMax = max(vertice[1] for vertice in points)
+
+  return ([xMin, xMax], [yMin, yMax])
+
+# CHECAGEM DO PONTO DENTRO DA PRIMITIVA
+
+def buildsVector(pointA, pointB): # AB = B - A
+  ''' Constrói um vetor a partir de dois pontos A e B
+
+    Args:
+      point A (list): Lista com um ponto (coordenadas x e y)
+      point B (list): Lista com um ponto (coordenadas x e y)
+
+    Returns:
+      vector (array): Vetor a partir dos pontos A e B
+    '''
+  vector = np.zeros(2, int)
+
+  iA = pointA[0]
+  jA = pointA[1]
+  iB = pointB[0]
+  jB = pointB[1]
+
+  vector[0] = iB-iA
+  vector[1] = jB-jA
+
+  return vector
+  
+# -----------------
+
+def findNormal(vector): # é basicamente uma rotação anti-horária
+  ''' Calcula o vetor normal a um vetor
+
+    Args:
+      vector (array): Vetor de um vértice a outro
+
+    Returns:
+      normal (array): Vetor normal a partir do vetor original
+    '''
+  normal = np.zeros(2, int)
+  
+  i = vector[0]
+  j = vector[1]
+
+  normal[0] = -j
+  normal[1] = i
+
+  return normal
+
+# -----------------  
+
+def insidePolygon(x, y, vertices): # para rotação no sentido anti-horário
+  '''Checa se o ponto (x,y) está dentro do polígono convexo.
+  
+  Args:
+    x (float): horizontal point position
+    y (float): vertical point position
+    vertices (list): lista de vértices do polígono
+  Returns:
+    False se (x,y) não está dentro do polígono, True caso contrário
+  '''
+
+  #inicialização de variáveis
+  vectors = [] #lista que vai conter vetores originais do polígono
+  vectorsToPoint = [] #lista que vai conter vetores dos vértices originais ao ponto desejado
+  normals = [] #lista que vai conter vetores normais aos vetores originais do polígono
+  alfas = [] #lista que vai conter o resultado do produto interno entre vetores originais e vetores com o ponto desejado
+  
+  # Ajustando o ponto
+  p = [x,y]
+
+  for i in range(len(vertices)):
+    # Construindo os vetores do polígono
+    # combina vertices (1, 2), (2, 3), ..., (n-1, n), (n, 1)
+    vectors.append(buildsVector(vertices[i], vertices[(i+1)%len(vertices)]))
+
+    # Construindo os vetores de cada vértice ao ponto
+    # combina vertices (1, p), (2, p), ..., (n, p)
+    vectorsToPoint.append(buildsVector(vertices[i], p))
+
+  # Encontrando as normais aos vetores do triângulo
+  for vector in vectors:
+    normals.append(findNormal(vector))
+
+  # Produto interno das normais de cada vetor do triângulo com os vetores dos vértices aos pontos
+  for i in range(len(normals)):
+    alfas.append(normals[i] @ vectorsToPoint[i])
+    # exemplo: alfaAB = nAB @ Ap
+
+  # Se todos os alfas forem positivos, sinal de que o ângulo é agudo e o ponto está dentro do triângulo
+  for a in alfas:
+    if (a < 0):
+      return False
+
+  return True
+
+  # -----------------  
+
 def inside(x, y, primitive):
   """
   Check if point (x,y) is inside the primitive
@@ -73,169 +294,6 @@ def inside(x, y, primitive):
 
   return False
 
-def buildsVector(pointA, pointB): # AB = B - A
-  vector = np.zeros(2, int)
-
-  iA = pointA[0]
-  jA = pointA[1]
-  iB = pointB[0]
-  jB = pointB[1]
-
-  vector[0] = iB-iA
-  vector[1] = jB-jA
-
-  return vector
-  
-# -----------------
-
-def findNormal(vector): # é basicamente uma rotação anti-horária
-  normal = np.zeros(2, int)
-  
-  i = vector[0]
-  j = vector[1]
-
-  normal[0] = -j
-  normal[1] = i
-
-  return normal
-
-# -----------------  
-
-def insidePolygon(x, y, vertices): # para rotação no sentido anti-horário
-
-  #inicialização de variáveis
-  vectors = [] #lista que vai conter vetores originais do polígono
-  vectorsToPoint = [] #lista que vai conter vetores dos vértices originais ao ponto desejado
-  normals = [] #lista que vai conter vetores normais aos vetores originais do polígono
-  alfas = [] #lista que vai conter o resultado do produto interno entre vetores originais e vetores com o ponto desejado
-  
-  # Ajustando o ponto
-  p = [x,y]
-
-  for i in range(len(vertices)):
-    # Construindo os vetores do polígono
-    # combina vertices (1, 2), (2, 3), ..., (n-1, n), (n, 1)
-    vectors.append(buildsVector(vertices[i], vertices[(i+1)%len(vertices)]))
-
-    # Construindo os vetores de cada vértice ao ponto
-    # combina vertices (1, p), (2, p), ..., (n, p)
-    vectorsToPoint.append(buildsVector(vertices[i], p))
-
-  # Encontrando as normais aos vetores do triângulo
-  for vector in vectors:
-    normals.append(findNormal(vector))
-
-  # Produto interno das normais de cada vetor do triângulo com os vetores dos vértices aos pontos
-  for i in range(len(normals)):
-    alfas.append(normals[i] @ vectorsToPoint[i])
-    # exemplo: alfaAB = nAB @ Ap
-
-  # Se todos os alfas forem positivos, sinal de que o ângulo é agudo e o ponto está dentro do triângulo
-  for a in alfas:
-    if (a < 0):
-      return False
-
-  return True
-
-def circleTransformation(primitive):
-  transTri = []
-
-  for triangle in primitive["triangulation"]:
-    dic = {}
-    dic["xform"] = primitive["xform"]
-    dic["vertices"] = triangle
-    transformation(dic)
-    transTri.append(dic["transVertices"])
-
-  primitive["transTriangles"] = transTri
-
-  return  
-
-# ----------------- 
-
-def transformation(primitive):
-  transMatrix = primitive["xform"]
-  vertices = primitive["vertices"].copy()
-  trans = []
-
-  for vertice in vertices:
-    x = vertice[0]
-    y = vertice[1]
-    xNew = transMatrix[0][0] * x + transMatrix[0][1] * y + transMatrix[0][2] * 1
-    yNew = transMatrix[1][0] * x + transMatrix[1][1] * y + transMatrix[1][2] * 1
-    xNew = int(xNew)
-    yNew = int(yNew)
-    trans.append([xNew, yNew])
-  
-  primitive["transVertices"] = trans
-
-  return
-
-def bBoxMultTriangles(primitive):
-  x = y = []
-
-  for triangle in primitive["transTriangles"]:
-    for vertice in triangle:
-      x.append(int(vertice[0]))
-      y.append(int(vertice[1]))
-
-  xMin = min(x)
-  xMax = max(x)
-  yMin = min(y)
-  yMax = max(y)
-
-  return xMin, xMax, yMin, yMax
-
-# ----------------- 
-
-def boundingBox(primitive): # consiste em pegar os maiores e menores x's e y's
-  
-  if (primitive["shape"] == "circle"):
-    if "xform" in primitive:
-      xMin, xMax, yMin, yMax = bBoxMultTriangles(primitive)        
-      
-    else:
-      center = primitive["center"]
-      radius = primitive["radius"]
-
-      xMin = center[0] - radius
-      xMax = center[0] + radius
-      yMin = center[1] - radius
-      yMax = center[1] + radius
-
-  else:
-    if "xform" in primitive:
-      points = primitive["transVertices"].copy()
-    else:
-      points = primitive["vertices"].copy()
-
-    xMin = min(vertice[0] for vertice in points)
-    xMax = max(vertice[0] for vertice in points)
-    yMin = min(vertice[1] for vertice in points)
-    yMax = max(vertice[1] for vertice in points)
-
-  return ([xMin, xMax], [yMin, yMax])
-
-def circleTriangulation(circle): # centro, raio * cosseno, raio * seno
-  triangles = []
-  points = []
-  slices = 60
-
-  for i in range(slices):
-    # somei ao centro pois o círculo não está necessariamente centrado na origem
-    x = circle["center"][0] + (circle["radius"] * np.cos((2 * np.pi * i) / 60))
-    y = circle["center"][1] + (circle["radius"] * np.sin((2 * np.pi * i) / 60)) 
-    point = [x, y]
-    points.append(point)
-
-  for i in range(slices):
-    A = circle["center"].copy()
-    B = points[i].copy()
-    C = points[(i+1)%slices].copy() 
-    triangles.append([A, B, C])
-
-  return triangles
-
 class Screen:
   ''' Creates a virtual basic screen
 
@@ -250,7 +308,8 @@ class Screen:
     self.create_image()
 
   def preprocess(self, scene):
-    ''' ?????????????
+    ''' Se a primitiva for um círculo, ela o triangulariza. 
+        Se a primitiva possuir transformação afim, ela a transforma.
 
     Args:
       scene (dict): Scene containing the graphic primitives
@@ -296,7 +355,8 @@ class Screen:
     self._image = 255 * np.ones((self._height, self._width, 3), np.uint8)
 
   def rasterize(self):
-    ''' Rasterize the primitives along the Screen    
+    ''' Rasterize the primitives along the Screen.
+        Define uma bounding box para cada primitiva.    
     '''
 
     for primitive in self._scene:
