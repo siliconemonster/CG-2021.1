@@ -20,6 +20,7 @@ from matplotlib import patheffects
 import matplotlib.pyplot as plt
 import json
 from google.colab import files
+import math
 
 """## Image upload"""
 
@@ -79,7 +80,73 @@ def box(image, bhandler):
   return filtered
 
 # função do filtro Sobel
+def sobel(image, bhandler):
 
+  if bhandler == 'icrop':
+    a, b = image.shape
+    X = Y = 0
+    filtered = np.zeros((a-2,b-2))
+
+    for row in range(1,len(image)-1):
+      for col in range(1, len(image[row])-1):
+        X = ((-1) * image[row-1][col-1] + 0 * image[row-1][col] + 1 * image[row-1][col+1] + (-2) * image[row][col-1] + 0 * image[row][col] + 2 * image[row][col+1] + (-1) * image[row+1][col-1] + 0 * image[row+1][col] + 1 * image[row+1][col+1])/8
+        Y = (1 * image[row-1][col-1] + 2 * image[row-1][col] + 1 * image[row-1][col+1] + 0 * image[row][col-1] + 0 * image[row][col] + 0 * image[row][col+1] + (-1) * image[row+1][col-1] + (-2) * image[row+1][col] + (-1) * image[row+1][col+1])/8
+        filtered[row-1][col-1] = math.sqrt(X*X+Y*Y)
+
+  if bhandler == 'extend': #posições onde o filtro vale 0 não serão adicionadas
+    X = Y = 0
+    filtered = np.zeros(image.shape)
+
+    # Quinas
+    X = ((-1) * image[0][0] + 1 * image[0][1] + (-2) * image[0][0] + 2 * image[0][1] + (-1) * image[1][0] + 1 * image[1][1])/8
+    Y = (1 * image[0][0] + 2 * image[0][0] + 1 * image[0][1] + (-1) * image[1][0] + (-2) * image[1][0] + (-1) * image[1][1])/8
+    filtered[0][0] = math.sqrt(X*X+Y*Y)
+
+    X = ((-1) * image[0][-1] + 1 * image[0][-2] + (-2) * image[0][-1] + 2 * image[0][-2] + (-1) * image[1][-1] + 1 * image[1][-2])/8
+    Y = (1 * image[0][-1] + 2 * image[0][-1] + 1 * image[0][-2] + (-1) * image[1][-1] + (-2) * image[1][-1] + (-1) * image[1][-2])/8
+    filtered[0][-1] = math.sqrt(X*X+Y*Y)
+
+    X = ((-1) * image[-1][0] + 1 * image[-1][1] + (-2) * image[-1][0] + 2 * image[-1][1] + (-1) * image[-2][0] + 1 * image[-2][1])/8
+    Y = (1 * image[-1][0] + 2 * image[-1][0] + 1 * image[-1][1] + (-1) * image[-2][0] + (-2) * image[-2][0] + (-1) * image[-2][1])/8
+    filtered[-1][0] = math.sqrt(X*X+Y*Y)
+
+    X = ((-1) * image[-1][-1] + 1 * image[-1][-2] + (-2) * image[-1][-1] + 2 * image[-1][-2] + (-1) * image[-2][-1] + 1 * image[-2][-2])/8
+    Y = (1 * image[-1][-1] + 2 * image[-1][-1] + 1 * image[-1][-2] + (-1) * image[-2][-1] + (-2) * image[-2][-1] + (-1) * image[-2][-2])/8
+    filtered[-1][-1] = math.sqrt(X*X+Y*Y)
+
+    # Extremidade - linhas
+    for col in range(1, len(image[0])-1):
+      # linha 0
+      X = ((-1) * image[0][col-1] + 1 * image[0][col+1] + (-2) * image[0][col-1] + 2 * image[0][col+1] + (-1) * image[1][col-1] + 1 * image[1][col+1])/8
+      Y = (1 * image[0][col-1] + 2 * image[0][col] + 1 * image[0][col+1] + (-1) * image[1][col-1] + (-2) * image[1][col]+ (-1) * image[1][col+1])/8
+      filtered[0][col] = math.sqrt(X*X+Y*Y)
+
+      # última linha
+      X = ((-1) * image[-2][col-1] + 1 * image[-2][col+1] + (-2) * image[-1][col-1] + 2 * image[-1][col+1] + (-1) * image[-1][col-1] + 1 * image[-1][col+1])/8
+      Y = (1 * image[-2][col-1] + 2 * image[-2][col] + 1 * image[-2][col+1] + (-1) * image[-1][col-1] + (-2) * image[-1][col] + (-1) * image[-1][col+1])/8
+      filtered[-1][col] = math.sqrt(X*X+Y*Y)     
+
+
+    # Extremidade - colunas
+    for row in range(1, len(image)-1):
+      # coluna 0 
+      X = ((-1) * image[row-1][0] + 1 * image[row+1][0] + (-2) * image[row-1][0] + 2 * image[row+1][0]+ (-1) * image[row-1][1] + 1 * image[row+1][1])/8
+      Y = (1 * image[row-1][0] + 2 * image[row][0] + 1 * image[row+1][0] + (-1) * image[row-1][1] + (-2) * image[row][1] + (-1) * image[row+1][1])/8
+      filtered[row][0] = math.sqrt(X*X+Y*Y)
+
+      # última coluna
+      X = ((-1) * image[row-1][-2] + 1 * image[row+1][-2] + (-2) * image[row-1][-1] + 2 * image[row+1][-1] + (-1) * image[row-1][-1] + 1 * image[row+1][-1])/8
+      Y = (1 * image[row-1][-2] + 2 * image[row][-2] + 1* image[row+1][-2] + (-1) * image[row-1][-1] + (-2) * image[row][-1] + (-1) * image[row+1][-1])/8
+      filtered[row][-1] = math.sqrt(X*X+Y*Y)
+
+    
+    for row in range(1,len(image)-1):
+      for col in range(1, len(image[row])-1):
+        X = ((-1) * image[row-1][col-1] + 0 * image[row-1][col] + 1 * image[row-1][col+1] + (-2) * image[row][col-1] + 0 * image[row][col] + 2 * image[row][col+1] + (-1) * image[row+1][col-1] + 0 * image[row+1][col] + 1 * image[row+1][col+1])/8
+        Y = (1 * image[row-1][col-1] + 2 * image[row-1][col] + 1 * image[row-1][col+1] + 0 * image[row][col-1] + 0 * image[row][col] + 0 * image[row][col+1] + (-1) * image[row+1][col-1] + (-2) * image[row+1][col] + (-1) * image[row+1][col+1])/8
+        filtered[row][col] = math.sqrt(X*X+Y*Y)
+
+  return filtered
 
 # função do filtro Laplace
 def laplace(image, bhandler):
@@ -147,6 +214,9 @@ class ImageProcesser:
 
     if self._kernel == 'box':
       self._image = box(self._image, self._bhandler)
+
+    if self._kernel == 'sobel':
+      self._image = sobel(self._image, self._bhandler)
 
     if self._kernel == 'laplace':
       self._image = laplace(self._image, self._bhandler)
