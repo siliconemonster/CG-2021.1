@@ -82,6 +82,41 @@ def box(image, bhandler):
 
 
 # função do filtro Laplace
+def laplace(image, bhandler):
+
+  if bhandler == 'icrop':
+    a, b = image.shape
+    filtered = np.zeros((a-2,b-2))
+
+    for row in range(1,len(image)-1):
+      for col in range(1, len(image[row])-1):
+        filtered[row-1][col-1] = (0 * image[row-1][col-1] + (-1) * image[row-1][col] + 0 * image[row-1][col+1] + (-1) * image[row][col-1] + 4 * image[row][col] + (-1) * image[row][col+1] + 0 * image[row+1][col-1] + (-1) * image[row+1][col] + 0 * image[row+1][col+1])/4
+
+
+  if bhandler == 'extend': #posições onde o filtro vale 0 não serão adicionadas
+    filtered = np.zeros(image.shape)
+    # QUINAS
+    filtered[0][0] = ((-1) * 2 * image[0][0] + 4 * image[0][0] + (-1) * image[0][1] + (-1) * image[1][0])/4
+    filtered[0][-1] = ((-1) * 2 * image[0][-1] + 4 * image[0][-1] + (-1) * image[0][-2] + (-1) * image[1][-1])/4
+    filtered[-1][0] = ((-1) * 2 * image[-1][0] + 4 * image[-1][0] + (-1) * image[-1][1] + (-1) * image[-2][0])/4
+    filtered[-1][-1] = ((-1) * 2 * image[-1][-1] + 4 * image[-1][-1] + (-1) * image[-1][-2] + (-1) * image[-2][-1])/4
+
+    # EXTREMIDADE - LINHAS
+    for col in range(1, len(image[0])-1):
+      filtered[0][col] = ((-1) * image[0][col] + (-1) * image[0][col-1] + 4 * image[0][col] + (-1) * image[0][col+1] + (-1) * image[1][col])/4 #linha 0
+      filtered[-1][col] = ((-1) * image[-2][col] + (-1) * image[-1][col-1] + 4 * image[-1][col]+ (-1) * image[-1][col+1] + (-1) * image[-1][col])/4 #última linha
+
+    # EXTREMIDADE - COLUNAS
+    for row in range(1, len(image)-1):
+      filtered[row][0] = ((-1) * image[row][0] + (-1) * image[row-1][0] + 4 * image[row][0] + (-1) * image[row+1][0]+ (-1) * image[row][1])/4 #coluna 0
+      filtered[row][-1] = ((-1) * image[row][-2] + (-1) * image[row-1][-1] + 4 * image[row][-1] + (-1) * image[row+1][-1] + (-1) * image[row][-1])/4 #última coluna
+
+    
+    for row in range(1,len(image)-1):
+      for col in range(1, len(image[row])-1):
+        filtered[row][col] = ((-1) * image[row-1][col] + (-1) * image[row][col-1] + 4 * image[row][col] + (-1) * image[row][col+1] + (-1) * image[row+1][col])/4
+
+  return filtered
 
 class ImageProcesser:
   ''' 
@@ -112,6 +147,10 @@ class ImageProcesser:
 
     if self._kernel == 'box':
       self._image = box(self._image, self._bhandler)
+
+    if self._kernel == 'laplace':
+      self._image = laplace(self._image, self._bhandler)
+
 
   def apply_xform(self):
     ''' 
