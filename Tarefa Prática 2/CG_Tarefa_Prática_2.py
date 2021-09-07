@@ -304,7 +304,17 @@ def inverseMapping(image, transMatrix):
   height = corners[0] - corners[2] # altura da matriz transformada
   width = corners[1] - corners[3] # largura da matriz transformada
   transformed = np.zeros((int(width),int(height))) # matriz vazia com as coordenadas já transformadas
-  invTransMatrix = np.linalg.inv(transMatrix).transpose() # matriz inversa
+  invTransMatrix = np.linalg.inv(transMatrix) # matriz inversa
+
+  # ajustes da matriz inversa
+  mat = np.array(invTransMatrix)
+  mat[0][0] = invTransMatrix[0][1]
+  mat[0][1] = invTransMatrix[0][0]
+  mat[1][0] = invTransMatrix[1][1]
+  mat[1][1] = invTransMatrix[1][0]
+  inv = np.array(mat)
+  inv[0] = mat[1]
+  inv[1] = mat[0]
 
   newP = []
   result = []
@@ -319,7 +329,7 @@ def inverseMapping(image, transMatrix):
   originalP = np.zeros(NPnewP.shape)
 
   for i in range(len(newP)):   
-    originalP[i] = invTransMatrix @ NPnewP[i] # P' = M^-1 * P
+    originalP[i] = inv @ NPnewP[i] # P' = M^-1 * P
                              # Lista indicando onde os pontos transformados cairiam na matriz original de pixels (inverse mapping)
                              # Agora conseguimos perceber que as listas têm nas mesmas posições o pixel transformado e o original,
                              # por exemplo: newP[0] e originalP[0] têm o pixel x transformado e o pixel x na posição inicial
